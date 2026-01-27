@@ -39,7 +39,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: ride-hailing-backend
     ports:
       - "8000:8000"
@@ -53,6 +53,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-ride_password}
       DB_POOL_MIN: 2
       DB_POOL_MAX: 10
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/package*.json:/app/package*.json
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,12 +67,17 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: ride-hailing-frontend
     ports:
       - "8089:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package*.json:/app/package*.json
     depends_on:
       - backend
     restart: unless-stopped
