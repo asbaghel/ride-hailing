@@ -1,85 +1,221 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
+import 'leaflet-geosearch/dist/geosearch.css';
 import '../styles/RideRequest.css';
+
+// Fix default marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
+});
 
 function RideRequest() {
   const [formData, setFormData] = useState({
     user_id: 'user_' + Math.random().toString(36).substr(2, 9),
     pickup_location: {
+      address: '',
       latitude: '',
       longitude: '',
-      address: '',
     },
     dropoff_location: {
+      address: '',
       latitude: '',
       longitude: '',
-      address: '',
     },
-    estimated_fare: '',
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [rideId, setRideId] = useState('');
+  const [selectedType, setSelectedType] = useState('pickup');
+  const [pickupSuggestions, setPickupSuggestions] = useState([]);
+  const [dropoffSuggestions, setDropoffSuggestions] = useState([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
 
-  const handleLocationChange = (type, field, value) => {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const pickupMarkerRef = useRef(null);
+  const dropoffMarkerRef = useRef(null);
+  const updateLocationRef = useRef(null);
+  const updateLocationFromClickRef = useRef(null);
+
+  const updateMarker = useCallback((lat, lng, type) => {
+    const markerRef = type === 'pickup' ? pickupMarkerRef : dropoffMarkerRef;
+    const markerColor = type === 'pickup' ? '#ef4444' : '#3b82f6';
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      const marker = L.circleMarker([lat, lng], {
+        radius: 8,
+        fillColor: markerColor,
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8,
+      }).addTo(mapInstanceRef.current);
+
+      markerRef.current = marker;
+    }
+
+    mapInstanceRef.current.setView([lat, lng], 14);
+  }, []);
+
+  const updateLocation = useCallback((lat, lng, address) => {
+    const newLat = typeof lat === 'number' ? lat : lng;
+    const newLng = typeof lat === 'number' ? lng : lat;
+
     setFormData((prev) => ({
       ...prev,
-      [type]: {
-        ...prev[type],
-        [field]: value,
+      [selectedType === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
+        address: address || '',
+        latitude: newLat.toString(),
+        longitude: newLng.toString(),
       },
     }));
-  };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    updateMarker(newLat, newLng, selectedType);
+  }, [selectedType, updateMarker]);
+
+  const updateLocationFromClick = useCallback((lat, lng) => {
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [selectedType === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
+        address: '',
+        latitude: lat.toString(),
+        longitude: lng.toString(),
+      },
     }));
+
+    updateMarker(lat, lng, selectedType);
+  }, [selectedType, updateMarker]);
+
+  // Store callback refs for use in map event listeners
+  useEffect(() => {
+    updateLocationRef.current = updateLocation;
+    updateLocationFromClickRef.current = updateLocationFromClick;
+  }, [updateLocation, updateLocationFromClick]);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const leafletMap = L.map(mapRef.current).setView([40.7128, -74.006], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(leafletMap);
+
+    // Add search control
+    const provider = new OpenStreetMapProvider();
+    const searchControl = new GeoSearchControl({
+      provider,
+      style: 'button',
+      showMarker: false,
+      showPopup: false,
+      autoClose: true,
+      retainZoomLevel: false,
+      animateZoom: true,
+      openMarkersSidebar: false,
+      maxMarkers: 5,
+    });
+
+    leafletMap.addControl(searchControl);
+
+    leafletMap.on('geosearch/showlocation', (result) => {
+      const { x, y, label } = result.location;
+      updateLocationRef.current(x, y, label);
+    });
+
+    // Handle map clicks for location selection
+    leafletMap.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      updateLocationFromClickRef.current(lat, lng);
+    });
+
+    mapInstanceRef.current = leafletMap;
+
+    return () => {
+      leafletMap.remove();
+    };
+  }, []);
+
+  const handleSearchInput = (value, type) => {
+    setFormData((prev) => ({
+      ...prev,
+      [type === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
+        ...prev[type === 'pickup' ? 'pickup_location' : 'dropoff_location'],
+        address: value,
+      },
+    }));
+
+    // Fetch suggestions
+    if (value.trim().length > 2) {
+      fetchSuggestions(value, type);
+    } else {
+      if (type === 'pickup') {
+        setPickupSuggestions([]);
+        setShowPickupSuggestions(false);
+      } else {
+        setDropoffSuggestions([]);
+        setShowDropoffSuggestions(false);
+      }
+    }
   };
 
-  const validateForm = () => {
-    if (
-      !formData.pickup_location.latitude ||
-      !formData.pickup_location.longitude ||
-      !formData.dropoff_location.latitude ||
-      !formData.dropoff_location.longitude
-    ) {
-      setError('Please fill in all location coordinates');
-      return false;
+  const fetchSuggestions = async (query, type) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}&limit=3`
+      );
+      const results = await response.json();
+
+      if (type === 'pickup') {
+        setPickupSuggestions(results);
+        setShowPickupSuggestions(true);
+      } else {
+        setDropoffSuggestions(results);
+        setShowDropoffSuggestions(true);
+      }
+    } catch (err) {
+      console.error('Error fetching suggestions:', err);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion, type) => {
+    const { lat, lon, display_name } = suggestion;
+    setFormData((prev) => ({
+      ...prev,
+      [type === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
+        address: display_name,
+        latitude: lat.toString(),
+        longitude: lon.toString(),
+      },
+    }));
+
+    if (type === 'pickup') {
+      setShowPickupSuggestions(false);
+      setPickupSuggestions([]);
+    } else {
+      setShowDropoffSuggestions(false);
+      setDropoffSuggestions([]);
     }
 
-    // Validate latitude/longitude ranges
-    const validateCoords = (lat, lng) => {
-      const latNum = parseFloat(lat);
-      const lngNum = parseFloat(lng);
-      return latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180;
-    };
-
-    if (
-      !validateCoords(
-        formData.pickup_location.latitude,
-        formData.pickup_location.longitude
-      )
-    ) {
-      setError('Invalid pickup location coordinates');
-      return false;
-    }
-
-    if (
-      !validateCoords(
-        formData.dropoff_location.latitude,
-        formData.dropoff_location.longitude
-      )
-    ) {
-      setError('Invalid dropoff location coordinates');
-      return false;
-    }
-
-    return true;
+    setSelectedType(type === 'pickup' ? 'pickup' : 'dropoff');
+    updateLocationRef.current(parseFloat(lat), parseFloat(lon), display_name);
   };
 
   const handleSubmit = async (e) => {
@@ -87,7 +223,14 @@ function RideRequest() {
     setError('');
     setSuccess(false);
 
-    if (!validateForm()) {
+    // Validate locations
+    if (
+      !formData.pickup_location.latitude ||
+      !formData.pickup_location.longitude ||
+      !formData.dropoff_location.latitude ||
+      !formData.dropoff_location.longitude
+    ) {
+      setError('Please select both pickup and dropoff locations on the map');
       return;
     }
 
@@ -106,7 +249,6 @@ function RideRequest() {
           longitude: parseFloat(formData.dropoff_location.longitude),
           address: formData.dropoff_location.address,
         },
-        estimated_fare: formData.estimated_fare ? parseFloat(formData.estimated_fare) : null,
       };
 
       const response = await axios.post(
@@ -126,17 +268,20 @@ function RideRequest() {
         setFormData({
           user_id: 'user_' + Math.random().toString(36).substr(2, 9),
           pickup_location: {
+            address: '',
             latitude: '',
             longitude: '',
-            address: '',
           },
           dropoff_location: {
+            address: '',
             latitude: '',
             longitude: '',
-            address: '',
           },
-          estimated_fare: '',
         });
+        if (pickupMarkerRef.current) pickupMarkerRef.current.remove();
+        if (dropoffMarkerRef.current) dropoffMarkerRef.current.remove();
+        pickupMarkerRef.current = null;
+        dropoffMarkerRef.current = null;
       }
     } catch (err) {
       setError(
@@ -148,34 +293,19 @@ function RideRequest() {
     }
   };
 
-  const getCurrentLocation = (type) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          handleLocationChange(type, 'latitude', latitude.toString());
-          handleLocationChange(type, 'longitude', longitude.toString());
-        },
-        (error) => {
-          setError(`Failed to get ${type} location: ${error.message}`);
-        }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser');
-    }
-  };
-
   return (
     <div className="ride-request-container">
       <div className="ride-request-header">
         <h1>Request a Ride</h1>
-        <p>Enter your pickup and dropoff locations</p>
+        <p>Select your pickup and dropoff locations</p>
       </div>
 
       {success && (
         <div className="success-message">
           <h3>✓ Ride Request Created Successfully!</h3>
-          <p>Ride ID: <strong>{rideId}</strong></p>
+          <p>
+            Ride ID: <strong>{rideId}</strong>
+          </p>
           <p>A driver will be assigned to your ride shortly.</p>
         </div>
       )}
@@ -187,177 +317,105 @@ function RideRequest() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="ride-request-form">
-        {/* User ID Section */}
-        <div className="form-section">
-          <label htmlFor="user_id">User ID</label>
-          <input
-            type="text"
-            id="user_id"
-            name="user_id"
-            value={formData.user_id}
-            onChange={handleInputChange}
-            disabled
-            className="disabled-input"
-          />
-          <small>Auto-generated unique identifier</small>
-        </div>
-
-        {/* Pickup Location Section */}
-        <div className="form-section">
-          <h3>Pickup Location</h3>
-          <button
-            type="button"
-            className="geolocation-btn"
-            onClick={() => getCurrentLocation('pickup_location')}
-          >
-            📍 Use Current Location
-          </button>
-
-          <div className="location-inputs">
-            <div className="input-group">
-              <label htmlFor="pickup_lat">Latitude</label>
-              <input
-                type="number"
-                id="pickup_lat"
-                step="0.000001"
-                min="-90"
-                max="90"
-                placeholder="e.g., 40.7128"
-                value={formData.pickup_location.latitude}
-                onChange={(e) =>
-                  handleLocationChange('pickup_location', 'latitude', e.target.value)
-                }
-                required
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="pickup_lng">Longitude</label>
-              <input
-                type="number"
-                id="pickup_lng"
-                step="0.000001"
-                min="-180"
-                max="180"
-                placeholder="e.g., -74.0060"
-                value={formData.pickup_location.longitude}
-                onChange={(e) =>
-                  handleLocationChange('pickup_location', 'longitude', e.target.value)
-                }
-                required
-              />
-            </div>
+      <div className="ride-request-content">
+        <div className="map-section">
+          <div className="map-controls">
+            <button
+              className={`location-btn ${selectedType === 'pickup' ? 'active' : ''}`}
+              onClick={() => setSelectedType('pickup')}
+            >
+              📍 Pickup
+            </button>
+            <button
+              className={`location-btn ${selectedType === 'dropoff' ? 'active' : ''}`}
+              onClick={() => setSelectedType('dropoff')}
+            >
+              📍 Dropoff
+            </button>
           </div>
-
-          <div className="input-group">
-            <label htmlFor="pickup_addr">Address (Optional)</label>
-            <input
-              type="text"
-              id="pickup_addr"
-              placeholder="e.g., 123 Main St, New York"
-              value={formData.pickup_location.address}
-              onChange={(e) =>
-                handleLocationChange('pickup_location', 'address', e.target.value)
-              }
-            />
+          <div id="map" ref={mapRef} className="map-container"></div>
+          <div className="map-info">
+            <p>👆 Click on map to set location or use search above</p>
           </div>
         </div>
 
-        {/* Dropoff Location Section */}
         <div className="form-section">
-          <h3>Dropoff Location</h3>
-          <button
-            type="button"
-            className="geolocation-btn"
-            onClick={() => getCurrentLocation('dropoff_location')}
-          >
-            📍 Use Current Location
-          </button>
-
-          <div className="location-inputs">
-            <div className="input-group">
-              <label htmlFor="dropoff_lat">Latitude</label>
-              <input
-                type="number"
-                id="dropoff_lat"
-                step="0.000001"
-                min="-90"
-                max="90"
-                placeholder="e.g., 40.7580"
-                value={formData.dropoff_location.latitude}
-                onChange={(e) =>
-                  handleLocationChange('dropoff_location', 'latitude', e.target.value)
-                }
-                required
-              />
+          <form onSubmit={handleSubmit}>
+            <div className="location-card">
+              <h3>🔴 Pickup Location</h3>
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Search pickup location..."
+                  value={formData.pickup_location.address}
+                  onChange={(e) =>
+                    handleSearchInput(e.target.value, 'pickup')
+                  }
+                  onFocus={() => pickupSuggestions.length > 0 && setShowPickupSuggestions(true)}
+                />
+                {showPickupSuggestions && pickupSuggestions.length > 0 && (
+                  <div className="suggestions-dropdown">
+                    {pickupSuggestions.map((suggestion, idx) => (
+                      <div
+                        key={idx}
+                        className="suggestion-item"
+                        onClick={() => handleSelectSuggestion(suggestion, 'pickup')}
+                      >
+                        <div className="suggestion-icon">📍</div>
+                        <div className="suggestion-text">
+                          <div className="suggestion-name">{suggestion.display_name.split(',')[0]}</div>
+                          <div className="suggestion-address">{suggestion.display_name.split(',').slice(1, 3).join(',')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {formData.pickup_location.latitude && (
+                <p className="location-set">✓ Location set</p>
+              )}
             </div>
 
-            <div className="input-group">
-              <label htmlFor="dropoff_lng">Longitude</label>
-              <input
-                type="number"
-                id="dropoff_lng"
-                step="0.000001"
-                min="-180"
-                max="180"
-                placeholder="e.g., -73.9855"
-                value={formData.dropoff_location.longitude}
-                onChange={(e) =>
-                  handleLocationChange('dropoff_location', 'longitude', e.target.value)
-                }
-                required
-              />
+            <div className="location-card">
+              <h3>🔵 Dropoff Location</h3>
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Search dropoff location..."
+                  value={formData.dropoff_location.address}
+                  onChange={(e) =>
+                    handleSearchInput(e.target.value, 'dropoff')
+                  }
+                  onFocus={() => dropoffSuggestions.length > 0 && setShowDropoffSuggestions(true)}
+                />
+                {showDropoffSuggestions && dropoffSuggestions.length > 0 && (
+                  <div className="suggestions-dropdown">
+                    {dropoffSuggestions.map((suggestion, idx) => (
+                      <div
+                        key={idx}
+                        className="suggestion-item"
+                        onClick={() => handleSelectSuggestion(suggestion, 'dropoff')}
+                      >
+                        <div className="suggestion-icon">📍</div>
+                        <div className="suggestion-text">
+                          <div className="suggestion-name">{suggestion.display_name.split(',')[0]}</div>
+                          <div className="suggestion-address">{suggestion.display_name.split(',').slice(1, 3).join(',')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {formData.dropoff_location.latitude && (
+                <p className="location-set">✓ Location set</p>
+              )}
             </div>
-          </div>
 
-          <div className="input-group">
-            <label htmlFor="dropoff_addr">Address (Optional)</label>
-            <input
-              type="text"
-              id="dropoff_addr"
-              placeholder="e.g., 456 Park Ave, New York"
-              value={formData.dropoff_location.address}
-              onChange={(e) =>
-                handleLocationChange('dropoff_location', 'address', e.target.value)
-              }
-            />
-          </div>
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? 'Creating Ride...' : 'Request Ride'}
+            </button>
+          </form>
         </div>
-
-        {/* Estimated Fare Section */}
-        <div className="form-section">
-          <label htmlFor="estimated_fare">Estimated Fare (Optional)</label>
-          <input
-            type="number"
-            id="estimated_fare"
-            name="estimated_fare"
-            step="0.01"
-            min="0"
-            placeholder="e.g., 15.50"
-            value={formData.estimated_fare}
-            onChange={handleInputChange}
-          />
-          <small>If not provided, it will be calculated after trip completion</small>
-        </div>
-
-        {/* Submit Button */}
-        <button
-          type="submit"
-          className="submit-btn"
-          disabled={loading}
-        >
-          {loading ? 'Creating Ride...' : 'Request Ride'}
-        </button>
-      </form>
-
-      <div className="example-locations">
-        <h4>📍 Example Coordinates:</h4>
-        <ul>
-          <li><strong>NYC Times Square:</strong> 40.7580, -73.9855</li>
-          <li><strong>NYC Central Park:</strong> 40.7829, -73.9654</li>
-          <li><strong>SF Golden Gate Bridge:</strong> 37.8199, -122.4783</li>
-        </ul>
       </div>
     </div>
   );

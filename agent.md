@@ -22,6 +22,7 @@ Use docker for everything where ever posible
 
 Use proper file names and directory structure
 Use proper variable names
+When ever adding new dependecies prompt me to install them or do it your self
 
 
 ### Backend 
@@ -33,6 +34,7 @@ Multi threading and concurrent request are handled, make APIs idempotent
 ### Frontend
 
 UI Theme keep it basic and simple
+Use Light color PostHog theme for UI
 Keep the UI Mobile friendly
 Frontend code should go to frontend folder
 Keep the UI consistent across all the pages
