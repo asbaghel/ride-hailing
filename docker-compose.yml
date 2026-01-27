@@ -1,6 +1,68 @@
 version: '3.9'
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ride-hailing-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-ride_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ride_password}
+      POSTGRES_DB: ${DB_NAME:-ride_hailing_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ride_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ride-hailing-network
+
+  # Adminer - Database Admin Tool
+  adminer:
+    image: adminer:latest
+    container_name: ride-hailing-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ride-hailing-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ride-hailing-backend
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-ride_hailing_db}
+      DB_USER: ${DB_USER:-ride_user}
+      DB_PASSWORD: ${DB_PASSWORD:-ride_password}
+      DB_POOL_MIN: 2
+      DB_POOL_MAX: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ride-hailing-network
+
+  # Frontend React App
   frontend:
     build:
       context: ./frontend
@@ -10,9 +72,15 @@ services:
       - "8089:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - backend
     restart: unless-stopped
     networks:
       - ride-hailing-network
+
+volumes:
+  postgres_data:
+    driver: local
 
 networks:
   ride-hailing-network:

@@ -1,0 +1,27 @@
+{
+  "name": "ride-hailing-backend",
+  "version": "1.0.0",
+  "description": "Ride Hailing Backend API",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "migration:run": "ts-node src/database/migrations/init.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.9.0",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/node": "^18.11.18",
+    "@types/uuid": "^9.0.2",
+    "typescript": "^4.9.4",
+    "ts-node": "^10.9.1"
+  }
+}
