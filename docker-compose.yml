@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ride-hailing-frontend
+    ports:
+      - "8089:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    restart: unless-stopped
+    networks:
+      - ride-hailing-network
+
+networks:
+  ride-hailing-network:
+    driver: bridge
