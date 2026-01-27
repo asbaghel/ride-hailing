@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import LocationSelector from '../components/LocationSelector';
+import RideStatus from '../components/RideStatus';
 import '../styles/RideRequestFlow.css';
 
 function RideRequest() {
@@ -113,6 +114,20 @@ function RideRequest() {
       setLoading(false);
     }
   };
+
+  // If ride is successfully created, show ride status
+  if (success && rideId) {
+    return (
+      <RideStatus
+        rideId={rideId}
+        onComplete={() => {
+          setSuccess(false);
+          setRideId('');
+          setCurrentStep(1);
+        }}
+      />
+    );
+  }
 
   // Step 1: Pickup location selection
   if (currentStep === 1) {
