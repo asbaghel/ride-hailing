@@ -35,3 +35,4 @@ Multi threading and concurrent request are handled, make APIs idempotent
 UI Theme keep it basic and simple
 Keep the UI Mobile friendly
 Frontend code should go to frontend folder
+Keep the UI consistent across all the pages

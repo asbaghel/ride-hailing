@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import '../styles/Home.css';
 
 function Home() {
@@ -33,7 +34,7 @@ function Home() {
         </section>
 
         <section className="cta-section">
-          <button className="btn btn-primary">Book a Ride</button>
+          <Link to="/request-ride" className="btn btn-primary">Book a Ride</Link>
           <button className="btn btn-secondary">Become a Driver</button>
         </section>
       </main>
