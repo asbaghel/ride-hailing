@@ -35,7 +35,7 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
 
       // Verify trip exists
       const getTripQuery = `SELECT * FROM trips WHERE id = $1;`;
-      const tripResult = await client.query<Trip>(getTripQuery, [trip_id]);
+      const tripResult = await client.query(getTripQuery, [trip_id]);
 
       if (tripResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -45,7 +45,7 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
         });
       }
 
-      const trip = tripResult.rows[0];
+      const trip = tripResult.rows[0] as Trip;
 
       // Create payment record with idempotency in mind
       const payment_id = uuidv4();
@@ -75,7 +75,7 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
         RETURNING *;
       `;
 
-      const insertResult = await client.query<Payment>(insertPaymentQuery, [
+      const insertResult = await client.query(insertPaymentQuery, [
         payment_id,
         trip_id,
         amount,
@@ -107,7 +107,7 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
 
       await client.query('COMMIT');
 
-      const payment = insertResult.rows[0];
+      const payment = insertResult.rows[0] as Payment;
 
       return res.status(201).json({
         success: true,

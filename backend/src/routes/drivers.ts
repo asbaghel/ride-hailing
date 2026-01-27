@@ -62,7 +62,7 @@ driversRouter.post('/:id/location', async (req: Request, res: Response) => {
         RETURNING *;
       `;
 
-      const updateResult = await client.query<Driver>(updateQuery, [id, latitude, longitude]);
+      const updateResult = await client.query(updateQuery, [id, latitude, longitude]);
 
       if (updateResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -74,7 +74,7 @@ driversRouter.post('/:id/location', async (req: Request, res: Response) => {
 
       await client.query('COMMIT');
 
-      const driver = updateResult.rows[0];
+      const driver = updateResult.rows[0] as Driver;
 
       return res.status(200).json({
         success: true,
@@ -148,7 +148,7 @@ driversRouter.post('/:id/accept', async (req: Request, res: Response) => {
         RETURNING *;
       `;
 
-      const driverResult = await client.query<Driver>(updateDriverQuery, [id]);
+      const driverResult = await client.query(updateDriverQuery, [id]);
 
       if (driverResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -160,7 +160,7 @@ driversRouter.post('/:id/accept', async (req: Request, res: Response) => {
 
       await client.query('COMMIT');
 
-      const driver = driverResult.rows[0];
+      const driver = driverResult.rows[0] as Driver;
       const ride = rideResult.rows[0];
 
       return res.status(200).json({

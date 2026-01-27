@@ -27,7 +27,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
 
       // Get the trip first
       const getTripQuery = `SELECT * FROM trips WHERE id = $1;`;
-      const tripResult = await client.query<Trip>(getTripQuery, [id]);
+      const tripResult = await client.query(getTripQuery, [id]);
 
       if (tripResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -37,7 +37,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
         });
       }
 
-      const trip = tripResult.rows[0];
+      const trip = tripResult.rows[0] as Trip;
 
       // Calculate fare: base_fare + (distance * per_km_rate) + (duration * per_minute_rate)
       const BASE_FARE = 2.5;
@@ -60,7 +60,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
         RETURNING *;
       `;
 
-      const updatedTripResult = await client.query<Trip>(updateTripQuery, [
+      const updatedTripResult = await client.query(updateTripQuery, [
         id,
         distance_km || 0,
         duration_minutes || 0,
@@ -75,7 +75,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
         });
       }
 
-      const updatedTrip = updatedTripResult.rows[0];
+      const updatedTrip = updatedTripResult.rows[0] as Trip;
 
       // Update ride to completed
       const updateRideQuery = `
@@ -88,7 +88,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
         RETURNING *;
       `;
 
-      const updatedRideResult = await client.query<Ride>(updateRideQuery, [
+      const updatedRideResult = await client.query(updateRideQuery, [
         trip.ride_id,
         calculated_fare,
       ]);
@@ -101,7 +101,7 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
         });
       }
 
-      const updatedRide = updatedRideResult.rows[0];
+      const updatedRide = updatedRideResult.rows[0] as Ride;
 
       // Update driver status back to online
       const updateDriverQuery = `
@@ -121,8 +121,14 @@ tripsRouter.post('/:id/end', async (req: Request, res: Response) => {
           trip: updatedTrip,
           ride: {
             ...updatedRide,
-            pickup_location: JSON.parse(updatedRide.pickup_location),
-            dropoff_location: JSON.parse(updatedRide.dropoff_location),
+            pickup_location: 
+              typeof updatedRide.pickup_location === 'string'
+                ? JSON.parse(updatedRide.pickup_location)
+                : updatedRide.pickup_location,
+            dropoff_location:
+              typeof updatedRide.dropoff_location === 'string'
+                ? JSON.parse(updatedRide.dropoff_location)
+                : updatedRide.dropoff_location,
           },
         },
         message: 'Trip ended and fare calculated successfully',
