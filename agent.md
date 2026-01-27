@@ -42,3 +42,5 @@ Use Light color PostHog theme for UI
 Keep the UI Mobile friendly
 Frontend code should go to frontend folder
 Keep the UI consistent across all the pages
+
+Use headless UI for UI components rather than building from scratch wherever possible - https://github.com/tailwindlabs/headlessui

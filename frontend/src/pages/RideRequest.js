@@ -1,23 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
-import 'leaflet-geosearch/dist/geosearch.css';
-import '../styles/RideRequest.css';
-
-// Fix default marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon-2x.png',
-  iconUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon.png',
-  shadowUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
-});
+import LocationSelector from '../components/LocationSelector';
+import '../styles/RideRequestFlow.css';
 
 function RideRequest() {
+  const [currentStep, setCurrentStep] = useState(1); // Step 1: pickup, Step 2: dropoff
   const [formData, setFormData] = useState({
     user_id: 'user_' + Math.random().toString(36).substr(2, 9),
     pickup_location: {
@@ -36,227 +23,27 @@ function RideRequest() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [rideId, setRideId] = useState('');
-  const [selectedType, setSelectedType] = useState('pickup');
-  const [pickupSuggestions, setPickupSuggestions] = useState([]);
-  const [dropoffSuggestions, setDropoffSuggestions] = useState([]);
-  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
-  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
 
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const pickupMarkerRef = useRef(null);
-  const dropoffMarkerRef = useRef(null);
-  const updateLocationRef = useRef(null);
-  const updateLocationFromClickRef = useRef(null);
-
-  const updateMarker = useCallback((lat, lng, type) => {
-    const markerRef = type === 'pickup' ? pickupMarkerRef : dropoffMarkerRef;
-    const markerColor = type === 'pickup' ? '#ef4444' : '#3b82f6';
-
-    if (markerRef.current) {
-      markerRef.current.setLatLng([lat, lng]);
-    } else {
-      const marker = L.circleMarker([lat, lng], {
-        radius: 8,
-        fillColor: markerColor,
-        color: '#fff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8,
-      }).addTo(mapInstanceRef.current);
-
-      markerRef.current = marker;
-    }
-
-    mapInstanceRef.current.setView([lat, lng], 14);
-  }, []);
-
-  const updateLocation = useCallback((lat, lng, address) => {
-    const newLat = typeof lat === 'number' ? lat : lng;
-    const newLng = typeof lat === 'number' ? lng : lat;
-
+  const handlePickupSelect = (location) => {
     setFormData((prev) => ({
       ...prev,
-      [selectedType === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
-        address: address || '',
-        latitude: newLat.toString(),
-        longitude: newLng.toString(),
-      },
+      pickup_location: location,
     }));
-
-    updateMarker(newLat, newLng, selectedType);
-  }, [selectedType, updateMarker]);
-
-  const updateLocationFromClick = useCallback((lat, lng) => {
-    setFormData((prev) => ({
-      ...prev,
-      [selectedType === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
-        address: '',
-        latitude: lat.toString(),
-        longitude: lng.toString(),
-      },
-    }));
-
-    updateMarker(lat, lng, selectedType);
-  }, [selectedType, updateMarker]);
-
-  // Store callback refs for use in map event listeners
-  useEffect(() => {
-    updateLocationRef.current = updateLocation;
-    updateLocationFromClickRef.current = updateLocationFromClick;
-  }, [updateLocation, updateLocationFromClick]);
-
-  // Initialize map with India as default
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    // Default center: Delhi, India
-    const defaultCenter = [28.6139, 77.2090];
-    const leafletMap = L.map(mapRef.current);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(leafletMap);
-
-    // Set initial view after map is ready
-    leafletMap.setView(defaultCenter, 17);
-
-    // Add current location marker
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Use setTimeout to ensure map DOM is fully ready
-          setTimeout(() => {
-            if (mapInstanceRef.current) {
-              mapInstanceRef.current.setView([latitude, longitude], 19);
-              
-              // Add current location marker (blue circle)
-              L.circleMarker([latitude, longitude], {
-                radius: 10,
-                fillColor: '#0ea5e9',
-                color: '#fff',
-                weight: 3,
-                opacity: 1,
-                fillOpacity: 0.8,
-              })
-                .bindPopup('📍 Your Current Location')
-                .addTo(mapInstanceRef.current);
-            }
-          }, 500);
-        },
-        (error) => {
-          console.log('Geolocation error:', error);
-          // Fallback to Delhi if geolocation fails
-        }
-      );
-    }
-
-    // Add search control
-    const provider = new OpenStreetMapProvider();
-    const searchControl = new GeoSearchControl({
-      provider,
-      style: 'button',
-      showMarker: false,
-      showPopup: false,
-      autoClose: true,
-      retainZoomLevel: false,
-      animateZoom: true,
-      openMarkersSidebar: false,
-      maxMarkers: 5,
-    });
-
-    leafletMap.addControl(searchControl);
-
-    leafletMap.on('geosearch/showlocation', (result) => {
-      const { x, y, label } = result.location;
-      updateLocationRef.current(x, y, label);
-    });
-
-    // Handle map clicks for location selection
-    leafletMap.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      updateLocationFromClickRef.current(lat, lng);
-    });
-
-    mapInstanceRef.current = leafletMap;
-
-    return () => {
-      leafletMap.remove();
-    };
-  }, []);
-
-  const handleSearchInput = (value, type) => {
-    setFormData((prev) => ({
-      ...prev,
-      [type === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
-        ...prev[type === 'pickup' ? 'pickup_location' : 'dropoff_location'],
-        address: value,
-      },
-    }));
-
-    // Fetch suggestions
-    if (value.trim().length > 2) {
-      fetchSuggestions(value, type);
-    } else {
-      if (type === 'pickup') {
-        setPickupSuggestions([]);
-        setShowPickupSuggestions(false);
-      } else {
-        setDropoffSuggestions([]);
-        setShowDropoffSuggestions(false);
-      }
-    }
+    setCurrentStep(2);
   };
 
-  const fetchSuggestions = async (query, type) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=3`
-      );
-      const results = await response.json();
-
-      if (type === 'pickup') {
-        setPickupSuggestions(results);
-        setShowPickupSuggestions(true);
-      } else {
-        setDropoffSuggestions(results);
-        setShowDropoffSuggestions(true);
-      }
-    } catch (err) {
-      console.error('Error fetching suggestions:', err);
-    }
-  };
-
-  const handleSelectSuggestion = (suggestion, type) => {
-    const { lat, lon, display_name } = suggestion;
+  const handleDropoffSelect = (location) => {
     setFormData((prev) => ({
       ...prev,
-      [type === 'pickup' ? 'pickup_location' : 'dropoff_location']: {
-        address: display_name,
-        latitude: lat.toString(),
-        longitude: lon.toString(),
-      },
+      dropoff_location: location,
     }));
-
-    if (type === 'pickup') {
-      setShowPickupSuggestions(false);
-      setPickupSuggestions([]);
-    } else {
-      setShowDropoffSuggestions(false);
-      setDropoffSuggestions([]);
-    }
-
-    setSelectedType(type === 'pickup' ? 'pickup' : 'dropoff');
-    updateLocationRef.current(parseFloat(lat), parseFloat(lon), display_name);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleBackFromDropoff = () => {
+    setCurrentStep(1);
+  };
+
+  const handleSubmit = async () => {
     setError('');
     setSuccess(false);
 
@@ -267,7 +54,7 @@ function RideRequest() {
       !formData.dropoff_location.latitude ||
       !formData.dropoff_location.longitude
     ) {
-      setError('Please select both pickup and dropoff locations on the map');
+      setError('Please select both pickup and dropoff locations');
       return;
     }
 
@@ -315,10 +102,7 @@ function RideRequest() {
             longitude: '',
           },
         });
-        if (pickupMarkerRef.current) pickupMarkerRef.current.remove();
-        if (dropoffMarkerRef.current) dropoffMarkerRef.current.remove();
-        pickupMarkerRef.current = null;
-        dropoffMarkerRef.current = null;
+        setCurrentStep(1);
       }
     } catch (err) {
       setError(
@@ -330,11 +114,24 @@ function RideRequest() {
     }
   };
 
+  // Step 1: Pickup location selection
+  if (currentStep === 1) {
+    return <LocationSelector locationType="pickup" onLocationSelect={handlePickupSelect} />;
+  }
+
+  // Step 2: Dropoff location selection and confirmation
   return (
-    <div className="ride-request-container">
-      <div className="ride-request-header">
-        <h1>Request a Ride</h1>
-        <p>Select your pickup and dropoff locations</p>
+    <div className="ride-request-flow">
+      <div className="step-indicator">
+        <div className="step completed">
+          <div className="step-number">1</div>
+          <div className="step-label">Pickup</div>
+        </div>
+        <div className="step-line"></div>
+        <div className="step active">
+          <div className="step-number">2</div>
+          <div className="step-label">Dropoff</div>
+        </div>
       </div>
 
       {success && (
@@ -354,104 +151,44 @@ function RideRequest() {
         </div>
       )}
 
-      <div className="ride-request-content">
-        <div className="map-section">
-          <div className="map-controls">
-            <button
-              className={`location-btn ${selectedType === 'pickup' ? 'active' : ''}`}
-              onClick={() => setSelectedType('pickup')}
-            >
-              📍 Pickup
-            </button>
-            <button
-              className={`location-btn ${selectedType === 'dropoff' ? 'active' : ''}`}
-              onClick={() => setSelectedType('dropoff')}
-            >
-              📍 Dropoff
-            </button>
-          </div>
-          <div id="map" ref={mapRef} className="map-container"></div>
-          <div className="map-info">
-            <p>👆 Click on map to set location or use search above</p>
-          </div>
+      <div className="dropoff-section">
+        <LocationSelector
+          locationType="dropoff"
+          onLocationSelect={handleDropoffSelect}
+          initialLocation={formData.dropoff_location}
+        />
+
+        <div className="actions-container">
+          <button className="back-btn" onClick={handleBackFromDropoff}>
+            ← Back to Pickup
+          </button>
+          <button
+            className="submit-ride-btn"
+            onClick={handleSubmit}
+            disabled={loading || !formData.dropoff_location.latitude}
+          >
+            {loading ? 'Creating Ride...' : 'Request Ride'}
+          </button>
         </div>
 
-        <div className="form-section">
-          <form onSubmit={handleSubmit}>
-            <div className="location-card">
-              <h3>🔴 Pickup Location</h3>
-              <div className="search-container">
-                <input
-                  type="text"
-                  placeholder="Search pickup location..."
-                  value={formData.pickup_location.address}
-                  onChange={(e) =>
-                    handleSearchInput(e.target.value, 'pickup')
-                  }
-                  onFocus={() => pickupSuggestions.length > 0 && setShowPickupSuggestions(true)}
-                />
-                {showPickupSuggestions && pickupSuggestions.length > 0 && (
-                  <div className="suggestions-dropdown">
-                    {pickupSuggestions.map((suggestion, idx) => (
-                      <div
-                        key={idx}
-                        className="suggestion-item"
-                        onClick={() => handleSelectSuggestion(suggestion, 'pickup')}
-                      >
-                        <div className="suggestion-icon">📍</div>
-                        <div className="suggestion-text">
-                          <div className="suggestion-name">{suggestion.display_name.split(',')[0]}</div>
-                          <div className="suggestion-address">{suggestion.display_name.split(',').slice(1, 3).join(',')}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {formData.pickup_location.latitude && (
-                <p className="location-set">✓ Location set</p>
-              )}
+        <div className="location-summary">
+          <h3>Ride Summary</h3>
+          <div className="summary-item">
+            <div className="summary-label">
+              <span className="summary-icon">🔴</span> Pickup
             </div>
-
-            <div className="location-card">
-              <h3>🔵 Dropoff Location</h3>
-              <div className="search-container">
-                <input
-                  type="text"
-                  placeholder="Search dropoff location..."
-                  value={formData.dropoff_location.address}
-                  onChange={(e) =>
-                    handleSearchInput(e.target.value, 'dropoff')
-                  }
-                  onFocus={() => dropoffSuggestions.length > 0 && setShowDropoffSuggestions(true)}
-                />
-                {showDropoffSuggestions && dropoffSuggestions.length > 0 && (
-                  <div className="suggestions-dropdown">
-                    {dropoffSuggestions.map((suggestion, idx) => (
-                      <div
-                        key={idx}
-                        className="suggestion-item"
-                        onClick={() => handleSelectSuggestion(suggestion, 'dropoff')}
-                      >
-                        <div className="suggestion-icon">📍</div>
-                        <div className="suggestion-text">
-                          <div className="suggestion-name">{suggestion.display_name.split(',')[0]}</div>
-                          <div className="suggestion-address">{suggestion.display_name.split(',').slice(1, 3).join(',')}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {formData.dropoff_location.latitude && (
-                <p className="location-set">✓ Location set</p>
-              )}
+            <div className="summary-value">
+              {formData.pickup_location.address || 'Location selected'}
             </div>
-
-            <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? 'Creating Ride...' : 'Request Ride'}
-            </button>
-          </form>
+          </div>
+          <div className="summary-item">
+            <div className="summary-label">
+              <span className="summary-icon">🔵</span> Dropoff
+            </div>
+            <div className="summary-value">
+              {formData.dropoff_location.address || 'Select dropoff location'}
+            </div>
+          </div>
         </div>
       </div>
     </div>
