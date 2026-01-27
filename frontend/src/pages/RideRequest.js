@@ -106,16 +106,53 @@ function RideRequest() {
     updateLocationFromClickRef.current = updateLocationFromClick;
   }, [updateLocation, updateLocationFromClick]);
 
-  // Initialize map
+  // Initialize map with India as default
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const leafletMap = L.map(mapRef.current).setView([40.7128, -74.006], 12);
+    // Default center: Delhi, India
+    const defaultCenter = [28.6139, 77.2090];
+    const leafletMap = L.map(mapRef.current);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
     }).addTo(leafletMap);
+
+    // Set initial view after map is ready
+    leafletMap.setView(defaultCenter, 17);
+
+    // Add current location marker
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Use setTimeout to ensure map DOM is fully ready
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.setView([latitude, longitude], 19);
+              
+              // Add current location marker (blue circle)
+              L.circleMarker([latitude, longitude], {
+                radius: 10,
+                fillColor: '#0ea5e9',
+                color: '#fff',
+                weight: 3,
+                opacity: 1,
+                fillOpacity: 0.8,
+              })
+                .bindPopup('📍 Your Current Location')
+                .addTo(mapInstanceRef.current);
+            }
+          }, 500);
+        },
+        (error) => {
+          console.log('Geolocation error:', error);
+          // Fallback to Delhi if geolocation fails
+        }
+      );
+    }
 
     // Add search control
     const provider = new OpenStreetMapProvider();

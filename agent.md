@@ -23,6 +23,10 @@ Use docker for everything where ever posible
 Use proper file names and directory structure
 Use proper variable names
 When ever adding new dependecies prompt me to install them or do it your self
+Make application specific to INDIA
+
+Split code into multiple files incase the file size is increasing more than 300 lines 
+Try to add new functionalities in seprate service or files 
 
 
 ### Backend 
