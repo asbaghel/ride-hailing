@@ -7,6 +7,7 @@ import ridesRouter from './routes/rides';
 import driversRouter from './routes/drivers';
 import tripsRouter from './routes/trips';
 import paymentsRouter from './routes/payments';
+import locationsRouter from './routes/locations';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.use('/v1/rides', ridesRouter);
 app.use('/v1/drivers', driversRouter);
 app.use('/v1/trips', tripsRouter);
 app.use('/v1/payments', paymentsRouter);
+app.use('/v1/locations', locationsRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

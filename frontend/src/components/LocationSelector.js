@@ -156,16 +156,29 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
 
   const fetchSuggestions = async (query) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=3`
-      );
-      const results = await response.json();
-      setSuggestions(results);
-      setShowSuggestions(true);
+      const response = await fetch('http://localhost:8000/v1/locations/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, limit: 3 }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setSuggestions(result.data || []);
+        setShowSuggestions(true);
+      } else {
+        console.error('API error:', result.error);
+        setSuggestions([]);
+      }
     } catch (err) {
       console.error('Error fetching suggestions:', err);
+      setSuggestions([]);
     }
   };
 
