@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
 });
 
-function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
+function LocationSelector({ locationType, onLocationSelect, initialLocation, referenceLocation }) {
   const [address, setAddress] = useState(initialLocation?.address || '');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -32,24 +32,40 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
   const markerLabel = locationType === 'pickup' ? '🔴 Pickup' : '🔵 Dropoff';
   const pageTitle = locationType === 'pickup' ? 'Select Pickup Location' : 'Select Dropoff Location';
 
+  const createCustomIcon = useCallback((color) => {
+    return L.divIcon({
+      html: `<div style="position: relative; width: 40px; height: 40px; cursor: grab;" title="Drag to move">
+        <div style="font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+          ${locationType === 'pickup' ? '📍' : '📍'}
+        </div>
+      </div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -40],
+      className: 'pin-marker',
+    });
+  }, [locationType]);
+
   const updateMarker = useCallback((lat, lng) => {
     if (markerRef.current) {
       markerRef.current.setLatLng([lat, lng]);
     } else {
-      const marker = L.circleMarker([lat, lng], {
-        radius: 10,
-        fillColor: markerColor,
-        color: '#fff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.8,
-      }).addTo(mapInstanceRef.current);
+      const marker = L.marker([lat, lng], {
+        icon: createCustomIcon(markerColor),
+        draggable: true,
+      })
+        .addTo(mapInstanceRef.current)
+        .bindPopup(`📍 ${markerLabel}`)
+        .on('dragend', (e) => {
+          const { lat: newLat, lng: newLng } = e.target.getLatLng();
+          updateLocationFromClickRef.current(newLat, newLng);
+        });
 
       markerRef.current = marker;
     }
 
     mapInstanceRef.current.setView([lat, lng], 19);
-  }, [markerColor]);
+  }, [markerColor, markerLabel, createCustomIcon]);
 
   const updateLocation = useCallback((lat, lng, locationAddress) => {
     const location = {
@@ -69,7 +85,40 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
     };
     setSelectedLocation(location);
     updateMarker(lat, lng);
+    
+    // Perform reverse geocoding to get address
+    reverseGeocodeLocation(lat, lng);
   }, [updateMarker]);
+
+  const reverseGeocodeLocation = async (lat, lng) => {
+    try {
+      const response = await fetch('http://localhost:8000/v1/locations/reverse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ latitude: lat, longitude: lng }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        // Use address if available, otherwise show lat/long
+        const displayAddress = result.data.address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        setAddress(displayAddress);
+      } else {
+        // Fallback to lat/long if no address found
+        setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      // Fallback to lat/long on error
+      setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    }
+  };
 
   // Store callback refs for use in map event listeners
   useEffect(() => {
@@ -81,78 +130,148 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Default center: Delhi, India
-    const defaultCenter = [28.6139, 77.2090];
-    const leafletMap = L.map(mapRef.current);
+    // Ensure the DOM is ready
+    const timer = setTimeout(() => {
+      // Default center: Delhi, India
+      const defaultCenter = [28.6139, 77.2090];
+      
+      try {
+        const leafletMap = L.map(mapRef.current, {
+          preferCanvas: true,
+        });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(leafletMap);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        }).addTo(leafletMap);
 
-    // Set initial view
-    leafletMap.setView(defaultCenter, 17);
+        // Set initial view
+        leafletMap.setView(defaultCenter, 17);
 
-    // Add current location marker
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setTimeout(() => {
-            if (mapInstanceRef.current) {
-              mapInstanceRef.current.setView([latitude, longitude], 19);
-              L.circleMarker([latitude, longitude], {
-                radius: 10,
-                fillColor: '#0ea5e9',
-                color: '#fff',
-                weight: 3,
-                opacity: 1,
-                fillOpacity: 0.8,
-              })
-                .bindPopup('📍 Your Current Location')
-                .addTo(mapInstanceRef.current);
+        // Add draggable marker for location selection
+        const initialLat = initialLocation?.latitude ? parseFloat(initialLocation.latitude) : defaultCenter[0];
+        const initialLng = initialLocation?.longitude ? parseFloat(initialLocation.longitude) : defaultCenter[1];
+        
+        const draggableMarker = L.marker([initialLat, initialLng], {
+          icon: createCustomIcon(markerColor),
+          draggable: true,
+        })
+          .addTo(leafletMap)
+          .bindPopup(`📍 ${markerLabel} - Drag to move`)
+          .openPopup();
+
+        draggableMarker.on('dragend', (e) => {
+          const { lat, lng } = e.target.getLatLng();
+          updateLocationFromClickRef.current(lat, lng);
+          e.target.openPopup();
+        });
+
+        markerRef.current = draggableMarker;
+        mapInstanceRef.current = leafletMap;
+
+        // Get current location and center map on it
+        if (navigator.geolocation && !initialLocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              if (mapInstanceRef.current && markerRef.current) {
+                // Determine reference location: use provided referenceLocation, or current location, or Delhi
+                let refLat = latitude;
+                let refLng = longitude;
+                
+                if (referenceLocation) {
+                  refLat = parseFloat(referenceLocation.latitude);
+                  refLng = parseFloat(referenceLocation.longitude);
+                }
+                
+                // Offset the draggable marker ~1-2 meters northeast from reference location
+                // 0.000015 degrees ≈ 1-2 meters at this latitude
+                const offsetLat = refLat + 0.000015;
+                const offsetLng = refLng + 0.000015;
+                
+                // Move draggable marker to offset position
+                markerRef.current.setLatLng([offsetLat, offsetLng]);
+                
+                // Center map on current location
+                mapInstanceRef.current.setView([latitude, longitude], 17);
+                
+                // Add current location marker
+                L.marker([latitude, longitude], {
+                  icon: L.divIcon({
+                    html: `<div style="background-color: #0ea5e9; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"></div>`,
+                    iconSize: [24, 24],
+                    className: 'current-location-marker',
+                  }),
+                })
+                  .bindPopup('📍 Your Current Location')
+                  .addTo(mapInstanceRef.current);
+                
+                // Add reference location marker if dropoff and pickup is selected
+                if (referenceLocation && locationType === 'dropoff') {
+                  L.marker([refLat, refLng], {
+                    icon: L.divIcon({
+                      html: `<div style="font-size: 28px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">📍</div>`,
+                      iconSize: [32, 32],
+                      iconAnchor: [16, 32],
+                      className: 'reference-location-marker',
+                    }),
+                  })
+                    .bindPopup('📍 Pickup Location')
+                    .addTo(mapInstanceRef.current);
+                }
+              }
+            },
+            (error) => {
+              console.log('Geolocation error:', error);
+              // Fall back to Delhi if geolocation fails
+              leafletMap.setView([initialLat, initialLng], 17);
             }
-          }, 500);
-        },
-        (error) => {
-          console.log('Geolocation error:', error);
+          );
+        } else {
+          // Use initial location or default to Delhi
+          leafletMap.setView([initialLat, initialLng], 17);
         }
-      );
-    }
 
-    // Add search control
-    const provider = new OpenStreetMapProvider();
-    const searchControl = new GeoSearchControl({
-      provider,
-      style: 'button',
-      showMarker: false,
-      showPopup: false,
-      autoClose: true,
-      retainZoomLevel: false,
-      animateZoom: true,
-      openMarkersSidebar: false,
-      maxMarkers: 5,
-    });
+        // Add search control
+        const provider = new OpenStreetMapProvider();
+        const searchControl = new GeoSearchControl({
+          provider,
+          style: 'button',
+          showMarker: false,
+          showPopup: false,
+          autoClose: true,
+          retainZoomLevel: false,
+          animateZoom: true,
+          openMarkersSidebar: false,
+          maxMarkers: 5,
+        });
 
-    leafletMap.addControl(searchControl);
+        leafletMap.addControl(searchControl);
 
-    leafletMap.on('geosearch/showlocation', (result) => {
-      const { x, y, label } = result.location;
-      updateLocationRef.current(x, y, label);
-    });
+        leafletMap.on('geosearch/showlocation', (result) => {
+          const { x, y, label } = result.location;
+          updateLocationRef.current(x, y, label);
+        });
 
-    // Handle map clicks
-    leafletMap.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      updateLocationFromClickRef.current(lat, lng);
-    });
-
-    mapInstanceRef.current = leafletMap;
+        // Handle map clicks to move marker
+        leafletMap.on('click', (e) => {
+          const { lat, lng } = e.latlng;
+          updateLocationFromClickRef.current(lat, lng);
+        });
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    }, 0);
 
     return () => {
-      leafletMap.remove();
+      clearTimeout(timer);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      markerRef.current = null;
     };
-  }, []);
+  }, [markerColor, markerLabel, initialLocation, referenceLocation, locationType, createCustomIcon]);
 
   const fetchSuggestions = async (query) => {
     try {
@@ -217,7 +336,12 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation }) {
         <div className="map-section">
           <div id="map" ref={mapRef} className="map-container"></div>
           <div className="map-info">
-            <p>👆 Click on map to set location or use search above</p>
+            <div className="map-instructions">
+              <div className="map-instructions-icon">✋</div>
+              <div className="map-instructions-text">
+                Drag the {markerLabel.toLowerCase()} marker or click on map to move it. Use search to find exact location.
+              </div>
+            </div>
           </div>
         </div>
 

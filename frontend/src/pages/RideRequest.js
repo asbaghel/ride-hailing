@@ -156,6 +156,7 @@ function RideRequest() {
           locationType="dropoff"
           onLocationSelect={handleDropoffSelect}
           initialLocation={formData.dropoff_location}
+          referenceLocation={formData.pickup_location}
         />
 
         <div className="actions-container">
