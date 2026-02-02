@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import LocationSelector from '../components/LocationSelector';
 import RideStatus from '../components/RideStatus';
+import { rides } from '../services/api';
 import '../styles/RideRequestFlow.css';
 
 function RideRequest() {
@@ -68,33 +68,15 @@ function RideRequest() {
     setLoading(true);
 
     try {
-      const payload = {
-        user_id: formData.user_id,
-        pickup_location: {
-          latitude: parseFloat(formData.pickup_location.latitude),
-          longitude: parseFloat(formData.pickup_location.longitude),
-          address: formData.pickup_location.address,
-        },
-        dropoff_location: {
-          latitude: parseFloat(formData.dropoff_location.latitude),
-          longitude: parseFloat(formData.dropoff_location.longitude),
-          address: formData.dropoff_location.address,
-        },
-      };
-
-      const response = await axios.post(
-        'http://localhost:8000/v1/rides',
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+      const response = await rides.create(
+        formData.pickup_location,
+        formData.dropoff_location,
+        formData.user_id
       );
 
-      if (response.data.success) {
+      if (response.success) {
         setSuccess(true);
-        setRideId(response.data.data.id);
+        setRideId(response.data.id);
         // Reset form
         setFormData({
           user_id: 'user_' + Math.random().toString(36).substr(2, 9),
@@ -110,11 +92,11 @@ function RideRequest() {
           },
         });
         setCurrentStep(1);
+      } else {
+        setError(response.error || 'Failed to create ride request');
       }
     } catch (err) {
-      setError(
-        err.response?.data?.error || 'Failed to create ride request. Please try again.'
-      );
+      setError('Failed to create ride request. Please try again.');
       console.error('Error creating ride:', err);
     } finally {
       setLoading(false);

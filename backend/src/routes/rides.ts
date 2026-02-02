@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import database from '../database/connection';
 import { Ride } from '../types';
+import { matchDriverToRide, assignDriverToRide } from '../services/driverMatching';
 
 const ridesRouter = Router();
 
@@ -55,6 +56,24 @@ ridesRouter.post('/', async (req: Request, res: Response) => {
 
     const ride = result.rows[0];
 
+    // Attempt to match and assign a driver
+    const matchedDriver = await matchDriverToRide(ride);
+    if (matchedDriver) {
+      const assignedRide = await assignDriverToRide(ride.id, matchedDriver.id);
+      if (assignedRide) {
+        return res.status(201).json({
+          success: true,
+          data: {
+            ...assignedRide,
+            pickup_location: JSON.parse(assignedRide.pickup_location as any),
+            dropoff_location: JSON.parse(assignedRide.dropoff_location as any),
+          },
+          message: 'Ride created successfully and driver assigned',
+        });
+      }
+    }
+
+    // If no driver found, return ride with pending status
     return res.status(201).json({
       success: true,
       data: {
@@ -62,7 +81,7 @@ ridesRouter.post('/', async (req: Request, res: Response) => {
         pickup_location: JSON.parse(ride.pickup_location as any),
         dropoff_location: JSON.parse(ride.dropoff_location as any),
       },
-      message: 'Ride created successfully',
+      message: 'Ride created successfully. Searching for drivers...',
     });
   } catch (error) {
     console.error('Error creating ride:', error);

@@ -3,13 +3,22 @@ const API_BASE_URL = 'http://localhost:8000/v1';
 
 // Rides API
 export const rides = {
-  create: async (pickupLocation, dropoffLocation) => {
+  create: async (pickupLocation, dropoffLocation, userId) => {
     const response = await fetch(`${API_BASE_URL}/rides`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pickup_location: pickupLocation,
-        dropoff_location: dropoffLocation,
+        user_id: userId || 'user_' + Math.random().toString(36).substr(2, 9),
+        pickup_location: {
+          latitude: parseFloat(pickupLocation.latitude),
+          longitude: parseFloat(pickupLocation.longitude),
+          address: pickupLocation.address,
+        },
+        dropoff_location: {
+          latitude: parseFloat(dropoffLocation.latitude),
+          longitude: parseFloat(dropoffLocation.longitude),
+          address: dropoffLocation.address,
+        },
       }),
     });
     return response.json();
