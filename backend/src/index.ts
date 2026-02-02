@@ -3,6 +3,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import database from './database/connection';
+import { seedDrivers } from './database/seeds';
 import ridesRouter from './routes/rides';
 import driversRouter from './routes/drivers';
 import tripsRouter from './routes/trips';
@@ -85,10 +86,14 @@ async function startServer() {
     await database.initialize();
     console.log('Database initialized successfully');
 
+    // Seed dummy drivers if needed
+    console.log('Seeding drivers...');
+    await seedDrivers();
+
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`\n✅ Server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
-      console.log(`API Documentation:`);
+      console.log(`\nAPI Endpoints:`);
       console.log(`  POST   /v1/rides - Create a ride`);
       console.log(`  GET    /v1/rides/:id - Get ride status`);
       console.log(`  POST   /v1/drivers/:id/location - Update driver location`);

@@ -44,3 +44,20 @@ Frontend code should go to frontend folder
 Keep the UI consistent across all the pages
 
 Use headless UI for UI components rather than building from scratch wherever possible - https://github.com/tailwindlabs/headlessui
+
+
+
+### Driver Matching Service
+
+
+Lets use this as the Driver matching Algorithm 
+score =
+  w1 * distance_to_rider
++ w2 * estimated_pickup_time
++ w3 * driver_idle_time
++ w4 * driver_rating_penalty
++ w5 * cancellation_risk
++ w6 * surge_priority
+
+
+Lower score = better match.

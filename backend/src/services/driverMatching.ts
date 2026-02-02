@@ -1,19 +1,27 @@
 import database from '../database/connection';
-import { Ride, Driver } from '../types';
+import { Ride, Driver, Location } from '../types';
+import {
+  selectBestDriver,
+  scoreDrivers,
+  ScoredDriver,
+  DEFAULT_MATCHING_CONFIG,
+  MatchingConfig,
+} from './matchingAlgorithm';
 
 /**
- * Simple driver matching algorithm
- * Returns the nearest available driver to pickup location
- * For now, this is a dummy implementation that picks any available driver
+ * Match a driver to a ride using the scoring algorithm
+ * Fetches available drivers and selects the best one
  */
-export async function matchDriverToRide(ride: Ride): Promise<Driver | null> {
+export async function matchDriverToRide(
+  ride: Ride,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG
+): Promise<Driver | null> {
   try {
-    // Get available drivers (status = 'online')
+    // Get all available drivers (status = 'online')
     const query = `
       SELECT * FROM drivers 
       WHERE status = 'online'
-      ORDER BY RANDOM()
-      LIMIT 1;
+      ORDER BY updated_at DESC;
     `;
 
     const result = await database.query<Driver>(query, []);
@@ -23,13 +31,46 @@ export async function matchDriverToRide(ride: Ride): Promise<Driver | null> {
       return null;
     }
 
-    const driver = result.rows[0];
-    console.log(`Matched driver ${driver.id} to ride ${ride.id}`);
-    
-    return driver;
+    // Select best driver using scoring algorithm
+    const bestDriver = selectBestDriver(result.rows, ride.pickup_location, config);
+
+    if (bestDriver) {
+      console.log(`Matched driver ${bestDriver.id} to ride ${ride.id}`);
+    }
+
+    return bestDriver;
   } catch (error) {
     console.error('Error matching driver to ride:', error);
     return null;
+  }
+}
+
+/**
+ * Get top N candidate drivers for a ride (for display or fallback logic)
+ */
+export async function getTopCandidateDrivers(
+  ride: Ride,
+  topN: number = 5,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG
+): Promise<ScoredDriver[]> {
+  try {
+    const query = `
+      SELECT * FROM drivers 
+      WHERE status = 'online'
+      ORDER BY updated_at DESC;
+    `;
+
+    const result = await database.query<Driver>(query, []);
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    const scored = scoreDrivers(result.rows, ride.pickup_location, config);
+    return scored.slice(0, Math.min(topN, scored.length));
+  } catch (error) {
+    console.error('Error getting candidate drivers:', error);
+    return [];
   }
 }
 
@@ -93,33 +134,3 @@ export async function assignDriverToRide(
   }
 }
 
-/**
- * Get nearest available driver based on current location
- * This is a more advanced version that can be implemented later
- * For now, we just get any available driver
- */
-export async function getNearestDriver(
-  pickupLat: number,
-  pickupLng: number
-): Promise<Driver | null> {
-  try {
-    // Get all available drivers with their current location
-    const query = `
-      SELECT * FROM drivers 
-      WHERE status = 'online'
-      ORDER BY RANDOM()
-      LIMIT 1;
-    `;
-
-    const result = await database.query<Driver>(query, []);
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error getting nearest driver:', error);
-    return null;
-  }
-}

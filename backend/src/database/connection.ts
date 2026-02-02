@@ -59,10 +59,16 @@ class Database {
             email VARCHAR(255) UNIQUE NOT NULL,
             phone VARCHAR(20),
             vehicle_number VARCHAR(50),
+            vehicle_type VARCHAR(50) DEFAULT 'economy',
             status VARCHAR(50) DEFAULT 'offline',
             current_location JSONB,
-            rating DECIMAL(3, 2) DEFAULT 0,
+            rating DECIMAL(3, 2) DEFAULT 4.5,
             total_rides INT DEFAULT 0,
+            cancellation_rate DECIMAL(3, 2) DEFAULT 0.0,
+            idle_time_seconds INT DEFAULT 0,
+            estimated_pickup_time_seconds INT DEFAULT 300,
+            surge_zone_priority DECIMAL(5, 2) DEFAULT 1.0,
+            last_location_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );

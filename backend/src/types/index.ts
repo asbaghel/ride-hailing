@@ -25,10 +25,16 @@ export interface Driver {
   email: string;
   phone?: string;
   vehicle_number?: string;
+  vehicle_type?: string;
   status: 'offline' | 'online' | 'on_trip';
   current_location?: Location;
   rating: number;
   total_rides: number;
+  cancellation_rate: number;
+  idle_time_seconds: number;
+  estimated_pickup_time_seconds: number;
+  surge_zone_priority: number;
+  last_location_update?: Date;
   created_at: Date;
   updated_at: Date;
 }
