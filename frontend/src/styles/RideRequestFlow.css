@@ -344,3 +344,131 @@
     max-width: 35%;
   }
 }
+
+/* Confirmation Section */
+.confirmation-section {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.confirmation-section h2 {
+  font-size: 1.8rem;
+  color: #1a1a1a;
+  margin-bottom: 30px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.location-details {
+  margin-bottom: 30px;
+}
+
+.location-card {
+  padding: 20px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  margin-bottom: 15px;
+  transition: all 0.2s ease;
+}
+
+.location-card:hover {
+  border-color: #d1d5db;
+  background: white;
+}
+
+.location-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.location-icon {
+  font-size: 1.5rem;
+}
+
+.location-type {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+}
+
+.location-address {
+  font-size: 1rem;
+  color: #1a1a1a;
+  font-weight: 500;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.location-coords {
+  font-size: 0.85rem;
+  color: #888;
+  font-family: 'Courier New', monospace;
+}
+
+.route-arrow {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #3b82f6;
+  margin: 10px 0;
+}
+
+.pickup-card {
+  border-left: 4px solid #ef4444;
+}
+
+.dropoff-card {
+  border-left: 4px solid #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .confirmation-section {
+    padding: 20px;
+    margin: 0 10px;
+  }
+
+  .confirmation-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  .location-card {
+    padding: 15px;
+    margin-bottom: 12px;
+  }
+
+  .location-address {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .confirmation-section {
+    padding: 15px;
+    margin: 0 5px;
+  }
+
+  .confirmation-section h2 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+  }
+
+  .location-card {
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .location-address {
+    font-size: 0.9rem;
+  }
+
+  .location-coords {
+    font-size: 0.75rem;
+  }
+}

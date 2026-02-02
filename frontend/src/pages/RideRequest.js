@@ -5,7 +5,7 @@ import RideStatus from '../components/RideStatus';
 import '../styles/RideRequestFlow.css';
 
 function RideRequest() {
-  const [currentStep, setCurrentStep] = useState(1); // Step 1: pickup, Step 2: dropoff
+  const [currentStep, setCurrentStep] = useState(1); // Step 1: pickup, Step 2: dropoff, Step 3: confirmation
   const [formData, setFormData] = useState({
     user_id: 'user_' + Math.random().toString(36).substr(2, 9),
     pickup_location: {
@@ -38,10 +38,16 @@ function RideRequest() {
       ...prev,
       dropoff_location: location,
     }));
+    // Move to confirmation step
+    setCurrentStep(3);
   };
 
   const handleBackFromDropoff = () => {
     setCurrentStep(1);
+  };
+
+  const handleBackFromConfirmation = () => {
+    setCurrentStep(2);
   };
 
   const handleSubmit = async () => {
@@ -134,81 +140,125 @@ function RideRequest() {
     return <LocationSelector locationType="pickup" onLocationSelect={handlePickupSelect} />;
   }
 
-  // Step 2: Dropoff location selection and confirmation
-  return (
-    <div className="ride-request-flow">
-      <div className="step-indicator">
-        <div className="step completed">
-          <div className="step-number">1</div>
-          <div className="step-label">Pickup</div>
-        </div>
-        <div className="step-line"></div>
-        <div className="step active">
-          <div className="step-number">2</div>
-          <div className="step-label">Dropoff</div>
-        </div>
-      </div>
-
-      {success && (
-        <div className="success-message">
-          <h3>✓ Ride Request Created Successfully!</h3>
-          <p>
-            Ride ID: <strong>{rideId}</strong>
-          </p>
-          <p>A driver will be assigned to your ride shortly.</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          <span>✕</span>
-          <p>{error}</p>
-        </div>
-      )}
-
-      <div className="dropoff-section">
-        <LocationSelector
-          locationType="dropoff"
-          onLocationSelect={handleDropoffSelect}
-          initialLocation={formData.dropoff_location}
-          referenceLocation={formData.pickup_location}
-        />
-
-        <div className="actions-container">
-          <button className="back-btn" onClick={handleBackFromDropoff}>
-            ← Back to Pickup
-          </button>
-          <button
-            className="submit-ride-btn"
-            onClick={handleSubmit}
-            disabled={loading || !formData.dropoff_location.latitude}
-          >
-            {loading ? 'Creating Ride...' : 'Request Ride'}
-          </button>
-        </div>
-
-        <div className="location-summary">
-          <h3>Ride Summary</h3>
-          <div className="summary-item">
-            <div className="summary-label">
-              <span className="summary-icon">🔴</span> Pickup
-            </div>
-            <div className="summary-value">
-              {formData.pickup_location.address || 'Location selected'}
-            </div>
+  // Step 2: Dropoff location selection
+  if (currentStep === 2) {
+    return (
+      <div className="ride-request-flow">
+        <div className="step-indicator">
+          <div className="step completed">
+            <div className="step-number">1</div>
+            <div className="step-label">Pickup</div>
           </div>
-          <div className="summary-item">
-            <div className="summary-label">
-              <span className="summary-icon">🔵</span> Dropoff
-            </div>
-            <div className="summary-value">
-              {formData.dropoff_location.address || 'Select dropoff location'}
-            </div>
+          <div className="step-line"></div>
+          <div className="step active">
+            <div className="step-number">2</div>
+            <div className="step-label">Dropoff</div>
+          </div>
+          <div className="step-line"></div>
+          <div className="step">
+            <div className="step-number">3</div>
+            <div className="step-label">Confirm</div>
+          </div>
+        </div>
+
+        <div className="dropoff-section">
+          <LocationSelector
+            locationType="dropoff"
+            onLocationSelect={handleDropoffSelect}
+            initialLocation={formData.dropoff_location}
+            referenceLocation={formData.pickup_location}
+          />
+
+          <div className="actions-container">
+            <button className="back-btn" onClick={handleBackFromDropoff}>
+              ← Back to Pickup
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Step 3: Confirmation
+  if (currentStep === 3) {
+    return (
+      <div className="ride-request-flow">
+        <div className="step-indicator">
+          <div className="step completed">
+            <div className="step-number">1</div>
+            <div className="step-label">Pickup</div>
+          </div>
+          <div className="step-line"></div>
+          <div className="step completed">
+            <div className="step-number">2</div>
+            <div className="step-label">Dropoff</div>
+          </div>
+          <div className="step-line"></div>
+          <div className="step active">
+            <div className="step-number">3</div>
+            <div className="step-label">Confirm</div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="error-message">
+            <span>✕</span>
+            <p>{error}</p>
+          </div>
+        )}
+
+        <div className="confirmation-section">
+          <h2>Confirm Your Ride</h2>
+          
+          <div className="location-details">
+            <div className="location-card pickup-card">
+              <div className="location-header">
+                <span className="location-icon">🔴</span>
+                <span className="location-type">Pickup Location</span>
+              </div>
+              <div className="location-address">
+                {formData.pickup_location.address || 'Location selected'}
+              </div>
+              <div className="location-coords">
+                {formData.pickup_location.latitude}, {formData.pickup_location.longitude}
+              </div>
+            </div>
+
+            <div className="route-arrow">↓</div>
+
+            <div className="location-card dropoff-card">
+              <div className="location-header">
+                <span className="location-icon">🔵</span>
+                <span className="location-type">Dropoff Location</span>
+              </div>
+              <div className="location-address">
+                {formData.dropoff_location.address || 'Location selected'}
+              </div>
+              <div className="location-coords">
+                {formData.dropoff_location.latitude}, {formData.dropoff_location.longitude}
+              </div>
+            </div>
+          </div>
+
+          <div className="actions-container">
+            <button className="back-btn" onClick={handleBackFromConfirmation}>
+              ← Edit Locations
+            </button>
+            <button
+              className="submit-ride-btn"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? 'Booking Ride...' : '🚗 Book Ride'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback
+  return null;
 }
 
 export default RideRequest;
