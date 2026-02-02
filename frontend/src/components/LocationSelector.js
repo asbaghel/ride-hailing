@@ -145,12 +145,18 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
           maxZoom: 19,
         }).addTo(leafletMap);
 
-        // Set initial view
-        leafletMap.setView(defaultCenter, 17);
+        // Set initial view - for dropoff with reference location, use reference location; otherwise use default
+        let mapCenter = defaultCenter;
+        if (referenceLocation && locationType === 'dropoff') {
+          mapCenter = [parseFloat(referenceLocation.latitude), parseFloat(referenceLocation.longitude)];
+        } else if (initialLocation) {
+          mapCenter = [parseFloat(initialLocation.latitude), parseFloat(initialLocation.longitude)];
+        }
+        leafletMap.setView(mapCenter, 17);
 
         // Add draggable marker for location selection
-        const initialLat = initialLocation?.latitude ? parseFloat(initialLocation.latitude) : defaultCenter[0];
-        const initialLng = initialLocation?.longitude ? parseFloat(initialLocation.longitude) : defaultCenter[1];
+        const initialLat = initialLocation?.latitude ? parseFloat(initialLocation.latitude) : mapCenter[0];
+        const initialLng = initialLocation?.longitude ? parseFloat(initialLocation.longitude) : mapCenter[1];
         
         const draggableMarker = L.marker([initialLat, initialLng], {
           icon: createCustomIcon(markerColor),
@@ -192,7 +198,7 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
                 // Move draggable marker to offset position
                 markerRef.current.setLatLng([offsetLat, offsetLng]);
                 
-                // Center map on current location
+                // Always center map on current location to show where user is
                 mapInstanceRef.current.setView([latitude, longitude], 17);
                 
                 // Add current location marker
