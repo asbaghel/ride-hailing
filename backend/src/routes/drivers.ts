@@ -126,7 +126,7 @@ driversRouter.post('/:id/accept', async (req: Request, res: Response) => {
       const updateRideQuery = `
         UPDATE rides 
         SET driver_id = $1, status = 'accepted', updated_at = NOW()
-        WHERE id = $2 AND status = 'pending'
+        WHERE id = $2 AND (status = 'pending' OR status = 'assigned')
         RETURNING *;
       `;
 
@@ -136,7 +136,7 @@ driversRouter.post('/:id/accept', async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         return res.status(404).json({
           success: false,
-          error: 'Ride not found or already accepted',
+          error: 'Ride not found or already completed',
         });
       }
 
@@ -175,8 +175,12 @@ driversRouter.post('/:id/accept', async (req: Request, res: Response) => {
           },
           ride: {
             ...ride,
-            pickup_location: JSON.parse(ride.pickup_location),
-            dropoff_location: JSON.parse(ride.dropoff_location),
+            pickup_location: typeof ride.pickup_location === 'string' 
+              ? JSON.parse(ride.pickup_location) 
+              : ride.pickup_location,
+            dropoff_location: typeof ride.dropoff_location === 'string'
+              ? JSON.parse(ride.dropoff_location)
+              : ride.dropoff_location,
           },
         },
         message: 'Ride accepted successfully',

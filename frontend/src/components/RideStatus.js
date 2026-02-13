@@ -79,94 +79,122 @@ function RideStatus({ rideId, onComplete }) {
     // Initial fetch
     fetchRideStatus();
 
-    // Only poll if ride is not completed
+    // Only poll if ride is in_progress or completed status
     let interval;
-    if (currentStep !== 'completed') {
+    if (ride && (ride.status === 'in_progress' || ride.status === 'completed')) {
       interval = setInterval(fetchRideStatus, 2000);
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [rideId, currentStep]);
+  }, [rideId, ride?.status]);
 
   // =====================================================
-  // DEMO MODE: Separate effect for simulating driver actions
-  // In production, these status changes would come from the driver app
+  // DEMO MODE: Auto-transition stages every 2 seconds
+  // Awaiting Driver → Driver Accepted → In Progress
   // =====================================================
   useEffect(() => {
     if (!ride) return;
 
-    // Simulate: After 3 seconds, driver accepts the ride (pending -> accepted)
-    if (ride.status === 'pending' && !demoSimulation.driverAccepted) {
-      console.log('📱 Demo: Driver accepting ride...');
-      const acceptTimeout = setTimeout(async () => {
-        try {
+    // Only auto-transition if in pending or accepted state
+    if (ride.status === 'in_progress' || ride.status === 'completed' || ride.status === 'cancelled') {
+      return;
+    }
+
+    const autoTransitionInterval = setInterval(async () => {
+      console.log('⏱️ Auto-transition check - Current status:', ride.status);
+
+      try {
+        // If pending → call accept API to move to accepted
+        if (ride.status === 'pending' && !demoSimulation.driverAccepted) {
+          console.log('📱 Auto: Accepting ride...');
           if (ride.driver_id) {
-            const response = await fetch(`http://localhost:8000/v1/drivers/${ride.driver_id}/accept`, {
+            const acceptRes = await fetch(`http://localhost:8000/v1/drivers/${ride.driver_id}/accept`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ride_id: rideId }),
             });
-            
-            if (response.ok) {
+            if (acceptRes.ok) {
+              console.log('✅ Ride accepted automatically');
               setDemoSimulation(prev => ({ ...prev, driverAccepted: true }));
-              console.log('✅ Driver accepted ride');
-            } else {
-              console.error('Failed to accept ride:', response.status);
+              
+              // Refetch ride status immediately after accept
+              const updatedRideRes = await fetch(`http://localhost:8000/v1/rides/${rideId}`);
+              if (updatedRideRes.ok) {
+                const updatedRideData = await updatedRideRes.json();
+                let updatedRide = updatedRideData.data;
+                if (typeof updatedRide.pickup_location === 'string') {
+                  updatedRide.pickup_location = JSON.parse(updatedRide.pickup_location);
+                }
+                if (typeof updatedRide.dropoff_location === 'string') {
+                  updatedRide.dropoff_location = JSON.parse(updatedRide.dropoff_location);
+                }
+                setRide(updatedRide);
+                console.log('🔄 Ride status updated:', updatedRide.status);
+              }
             }
           }
-        } catch (err) {
-          console.error('Demo: Failed to accept ride:', err);
         }
-      }, 3000);
-      
-      return () => clearTimeout(acceptTimeout);
-    }
-
-    // Simulate: After ride is accepted, automatically start the trip (accepted -> in_progress)
-    if ((ride.status === 'accepted' || ride.status === 'assigned') && !demoSimulation.rideStarted) {
-      console.log('🚗 Demo: Starting trip...');
-      const startTimeout = setTimeout(async () => {
-        try {
-          // Call backend to update ride status to 'in_progress'
-          await fetch(`http://localhost:8000/v1/rides/${rideId}`, {
+        // If accepted → call PUT to move to in_progress and create trip
+        else if ((ride.status === 'accepted' || ride.status === 'assigned') && !demoSimulation.rideStarted) {
+          console.log('🚗 Auto: Starting trip...');
+          
+          // Update ride status to in_progress
+          const startRes = await fetch(`http://localhost:8000/v1/rides/${rideId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'in_progress' }),
           });
-          
-          // Create a trip for this ride
-          try {
-            const tripRes = await fetch('http://localhost:8000/v1/trips', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                ride_id: rideId,
-                distance_km: Math.random() * 15 + 2, // Random distance 2-17 km
-                duration_minutes: Math.random() * 25 + 5, // Random duration 5-30 min
-                fare_amount: Math.random() * 400 + 100, // Random fare 100-500
-              }),
-            });
+
+          if (startRes.ok) {
+            console.log('✅ Trip started automatically');
             
-            if (tripRes.ok) {
-              const tripData = await tripRes.json();
-              setTrip(tripData.data);
-              console.log('✅ Trip created');
+            // Create trip with demo data
+            try {
+              const tripRes = await fetch('http://localhost:8000/v1/trips', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ride_id: rideId,
+                  distance_km: Math.random() * 15 + 2,
+                  duration_minutes: Math.random() * 25 + 5,
+                  fare_amount: Math.random() * 400 + 100,
+                }),
+              });
+              if (tripRes.ok) {
+                const tripData = await tripRes.json();
+                setTrip(tripData.data);
+                console.log('✅ Trip created automatically');
+              }
+            } catch (tripErr) {
+              console.error('Failed to create trip:', tripErr);
             }
-          } catch (tripErr) {
-            console.error('Failed to create trip:', tripErr);
+
+            setDemoSimulation(prev => ({ ...prev, rideStarted: true }));
+            
+            // Refetch ride status immediately after starting trip
+            const updatedRideRes = await fetch(`http://localhost:8000/v1/rides/${rideId}`);
+            if (updatedRideRes.ok) {
+              const updatedRideData = await updatedRideRes.json();
+              let updatedRide = updatedRideData.data;
+              if (typeof updatedRide.pickup_location === 'string') {
+                updatedRide.pickup_location = JSON.parse(updatedRide.pickup_location);
+              }
+              if (typeof updatedRide.dropoff_location === 'string') {
+                updatedRide.dropoff_location = JSON.parse(updatedRide.dropoff_location);
+              }
+              setRide(updatedRide);
+              console.log('🔄 Ride status updated:', updatedRide.status);
+            }
           }
-          
-          setDemoSimulation(prev => ({ ...prev, rideStarted: true }));
-          console.log('✅ Trip started');
-        } catch (err) {
-          console.error('Demo: Failed to start trip:', err);
         }
-      }, 4500);
-      
-      return () => clearTimeout(startTimeout);
-    }
+      } catch (err) {
+        console.error('Auto-transition error:', err);
+      }
+    }, 2000);
+
+    return () => clearInterval(autoTransitionInterval);
   }, [ride, rideId, demoSimulation]);
 
   const handleEndTrip = async () => {
