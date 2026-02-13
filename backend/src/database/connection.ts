@@ -74,6 +74,28 @@ class Database {
           );
         `);
 
+        // Add missing columns to drivers table if they don't exist (for schema migration)
+        const columnsToAdd = [
+          { name: 'vehicle_type', definition: "VARCHAR(50) DEFAULT 'economy'" },
+          { name: 'cancellation_rate', definition: 'DECIMAL(3, 2) DEFAULT 0.0' },
+          { name: 'idle_time_seconds', definition: 'INT DEFAULT 0' },
+          { name: 'estimated_pickup_time_seconds', definition: 'INT DEFAULT 300' },
+          { name: 'surge_zone_priority', definition: 'DECIMAL(5, 2) DEFAULT 1.0' },
+          { name: 'last_location_update', definition: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+        ];
+
+        for (const column of columnsToAdd) {
+          try {
+            await client.query(`
+              ALTER TABLE drivers 
+              ADD COLUMN IF NOT EXISTS ${column.name} ${column.definition};
+            `);
+          } catch (error) {
+            // Column might already exist, continue
+            console.log(`Column ${column.name} already exists or skipped`);
+          }
+        }
+
         // Create trips table
         await client.query(`
           CREATE TABLE IF NOT EXISTS trips (
