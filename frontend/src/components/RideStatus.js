@@ -15,22 +15,32 @@ function RideStatus({ rideId, onComplete }) {
     const fetchRideStatus = async () => {
       try {
         const rideData = await rides.getStatus(rideId);
-        setRide(rideData.data);
+        let ride = rideData.data;
+
+        // Parse locations if they're strings
+        if (typeof ride.pickup_location === 'string') {
+          ride.pickup_location = JSON.parse(ride.pickup_location);
+        }
+        if (typeof ride.dropoff_location === 'string') {
+          ride.dropoff_location = JSON.parse(ride.dropoff_location);
+        }
+
+        setRide(ride);
 
         // Determine step
-        if (rideData.data.status === 'completed') {
+        if (ride.status === 'completed') {
           setCurrentStep('completed');
-          if (rideData.data.trip_id) {
-            const tripData = await trips.getTrip(rideData.data.trip_id);
+          if (ride.trip_id) {
+            const tripData = await trips.getTrip(ride.trip_id);
             setTrip(tripData.data);
           }
-        } else if (rideData.data.status === 'in_progress') {
+        } else if (ride.status === 'in_progress') {
           setCurrentStep('in_progress');
-          if (rideData.data.trip_id) {
-            const tripData = await trips.getTrip(rideData.data.trip_id);
+          if (ride.trip_id) {
+            const tripData = await trips.getTrip(ride.trip_id);
             setTrip(tripData.data);
           }
-        } else if (rideData.data.status === 'assigned') {
+        } else if (ride.status === 'assigned') {
           setCurrentStep('accepted');
         } else {
           setCurrentStep('awaiting');

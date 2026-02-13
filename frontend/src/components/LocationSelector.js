@@ -21,6 +21,7 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(initialLocation || null);
+  const [isGeocodingPending, setIsGeocodingPending] = useState(false);
 
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -84,13 +85,14 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
       address: '',
     };
     setSelectedLocation(location);
+    setIsGeocodingPending(true);
     updateMarker(lat, lng);
     
     // Perform reverse geocoding to get address
-    reverseGeocodeLocation(lat, lng);
+    reverseGeocodeLocation(lat, lng, location);
   }, [updateMarker]);
 
-  const reverseGeocodeLocation = async (lat, lng) => {
+  const reverseGeocodeLocation = async (lat, lng, locationObj = null) => {
     try {
       const response = await fetch('http://localhost:8000/v1/locations/reverse', {
         method: 'POST',
@@ -109,14 +111,32 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
         // Use address if available, otherwise show lat/long
         const displayAddress = result.data.address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         setAddress(displayAddress);
+        
+        // Also update the selectedLocation object with the address
+        setSelectedLocation((prev) => ({
+          ...prev,
+          address: displayAddress,
+        }));
       } else {
         // Fallback to lat/long if no address found
-        setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        const fallbackAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        setAddress(fallbackAddress);
+        setSelectedLocation((prev) => ({
+          ...prev,
+          address: fallbackAddress,
+        }));
       }
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       // Fallback to lat/long on error
-      setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      const fallbackAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      setAddress(fallbackAddress);
+      setSelectedLocation((prev) => ({
+        ...prev,
+        address: fallbackAddress,
+      }));
+    } finally {
+      setIsGeocodingPending(false);
     }
   };
 
@@ -392,9 +412,9 @@ function LocationSelector({ locationType, onLocationSelect, initialLocation, ref
           <button
             className="confirm-btn"
             onClick={handleConfirm}
-            disabled={!selectedLocation?.latitude}
+            disabled={!selectedLocation?.latitude || isGeocodingPending}
           >
-            Confirm {locationType === 'pickup' ? 'Pickup' : 'Dropoff'} Location
+            {isGeocodingPending ? 'Getting Address...' : `Confirm ${locationType === 'pickup' ? 'Pickup' : 'Dropoff'} Location`}
           </button>
         </div>
       </div>
