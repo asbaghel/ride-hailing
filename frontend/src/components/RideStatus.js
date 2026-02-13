@@ -13,6 +13,7 @@ function RideStatus({ rideId, onComplete }) {
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState('awaiting'); // awaiting, accepted, in_progress, completed, payment
   const [showPayment, setShowPayment] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [demoSimulation, setDemoSimulation] = useState({
     driverAccepted: false,
     rideStarted: false,
@@ -212,6 +213,7 @@ function RideStatus({ rideId, onComplete }) {
         };
         setTrip(demoTrip);
         setCurrentStep('completed');
+        setShowSummary(true);
         
         // Free the driver
         if (ride?.driver_id) {
@@ -226,11 +228,6 @@ function RideStatus({ rideId, onComplete }) {
             console.error('Failed to free driver:', err);
           }
         }
-        
-        // Redirect to home after 2 seconds
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
       } catch (err) {
         setError('Failed to create demo trip');
       }
@@ -243,6 +240,7 @@ function RideStatus({ rideId, onComplete }) {
       if (result.success) {
         setTrip(result.data);
         setCurrentStep('completed');
+        setShowSummary(true);
         
         // Free the driver - set status back to 'online'
         if (ride?.driver_id) {
@@ -257,11 +255,6 @@ function RideStatus({ rideId, onComplete }) {
             console.error('Failed to free driver:', err);
           }
         }
-        
-        // Redirect to home after 2 seconds
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
       }
     } catch (err) {
       setError('Failed to end trip');
@@ -285,6 +278,81 @@ function RideStatus({ rideId, onComplete }) {
       }, 1000);
     }
   };
+
+  // Show summary screen
+  if (showSummary && trip) {
+    return (
+      <div className="ride-status-container">
+        <div className="ride-status-header">
+          <h2>✅ Trip Completed</h2>
+        </div>
+
+        <div className="ride-status-content">
+          <div className="summary-card">
+            <div className="summary-section">
+              <h3>📍 Trip Summary</h3>
+              <div className="summary-item">
+                <span>From:</span>
+                <span className="value">{ride?.pickup_location?.address || 'N/A'}</span>
+              </div>
+              <div className="summary-item">
+                <span>To:</span>
+                <span className="value">{ride?.dropoff_location?.address || 'N/A'}</span>
+              </div>
+            </div>
+
+            <div className="summary-section">
+              <h3>📊 Trip Details</h3>
+              <div className="summary-item">
+                <span>Distance:</span>
+                <span className="value">{trip.distance_km?.toFixed(2) || '0'} km</span>
+              </div>
+              <div className="summary-item">
+                <span>Duration:</span>
+                <span className="value">{trip.duration_minutes || '0'} minutes</span>
+              </div>
+            </div>
+
+            <div className="summary-section">
+              <h3>👨‍💼 Driver Info</h3>
+              <div className="summary-item">
+                <span>Name:</span>
+                <span className="value">{driver?.name || 'N/A'}</span>
+              </div>
+              <div className="summary-item">
+                <span>Vehicle:</span>
+                <span className="value">{driver?.vehicle_number || 'N/A'}</span>
+              </div>
+              <div className="summary-item">
+                <span>Rating:</span>
+                <span className="value">⭐ {driver?.rating || '4.5'}</span>
+              </div>
+            </div>
+
+            <div className="summary-section fare-section">
+              <h3>💰 Fare</h3>
+              <div className="fare-amount">₹ {trip.fare_amount?.toFixed(2) || '0'}</div>
+            </div>
+          </div>
+
+          <div className="summary-buttons">
+            <button 
+              className="btn btn-primary" 
+              onClick={() => navigate('/')}
+            >
+              Back to Home
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setShowPayment(true)}
+            >
+              View Payment Details
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show payment screen
   if (showPayment && trip) {
