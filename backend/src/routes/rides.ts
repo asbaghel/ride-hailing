@@ -160,6 +160,81 @@ ridesRouter.get('/:id', async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /v1/rides/:id - Update ride status (for demo/driver app)
+ * Request body: { status: 'assigned' | 'in_progress' | 'completed' }
+ */
+ridesRouter.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ride ID is required',
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required',
+      });
+    }
+
+    const validStatuses = ['pending', 'assigned', 'in_progress', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    const query = `
+      UPDATE rides 
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING *;
+    `;
+
+    const ride = await database.queryOne<Ride>(query, [status, id]);
+
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        error: 'Ride not found',
+      });
+    }
+
+    // Parse locations if they're strings
+    const pickupLocation = typeof ride.pickup_location === 'string'
+      ? JSON.parse(ride.pickup_location)
+      : ride.pickup_location;
+    const dropoffLocation = typeof ride.dropoff_location === 'string'
+      ? JSON.parse(ride.dropoff_location)
+      : ride.dropoff_location;
+
+    console.log(`✅ Ride ${id} status updated to: ${status}`);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...ride,
+        pickup_location: pickupLocation,
+        dropoff_location: dropoffLocation,
+      },
+      message: `Ride status updated to ${status}`,
+    });
+  } catch (error) {
+    console.error('Error updating ride:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+/**
  * PUT /v1/rides/:id/cancel - Cancel a ride
  */
 ridesRouter.put('/:id/cancel', async (req: Request, res: Response) => {
