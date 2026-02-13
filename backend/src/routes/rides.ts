@@ -61,12 +61,20 @@ ridesRouter.post('/', async (req: Request, res: Response) => {
     if (matchedDriver) {
       const assignedRide = await assignDriverToRide(ride.id, matchedDriver.id);
       if (assignedRide) {
+        // Parse locations if they're strings
+        const pickupLocation = typeof assignedRide.pickup_location === 'string' 
+          ? JSON.parse(assignedRide.pickup_location) 
+          : assignedRide.pickup_location;
+        const dropoffLocation = typeof assignedRide.dropoff_location === 'string'
+          ? JSON.parse(assignedRide.dropoff_location)
+          : assignedRide.dropoff_location;
+
         return res.status(201).json({
           success: true,
           data: {
             ...assignedRide,
-            pickup_location: JSON.parse(assignedRide.pickup_location as any),
-            dropoff_location: JSON.parse(assignedRide.dropoff_location as any),
+            pickup_location: pickupLocation,
+            dropoff_location: dropoffLocation,
           },
           message: 'Ride created successfully and driver assigned',
         });
@@ -74,12 +82,19 @@ ridesRouter.post('/', async (req: Request, res: Response) => {
     }
 
     // If no driver found, return ride with pending status
+    const pickupLocation = typeof ride.pickup_location === 'string'
+      ? JSON.parse(ride.pickup_location)
+      : ride.pickup_location;
+    const dropoffLocation = typeof ride.dropoff_location === 'string'
+      ? JSON.parse(ride.dropoff_location)
+      : ride.dropoff_location;
+
     return res.status(201).json({
       success: true,
       data: {
         ...ride,
-        pickup_location: JSON.parse(ride.pickup_location as any),
-        dropoff_location: JSON.parse(ride.dropoff_location as any),
+        pickup_location: pickupLocation,
+        dropoff_location: dropoffLocation,
       },
       message: 'Ride created successfully. Searching for drivers...',
     });
@@ -119,12 +134,20 @@ ridesRouter.get('/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Parse locations if they're strings
+    const pickupLocation = typeof ride.pickup_location === 'string'
+      ? JSON.parse(ride.pickup_location)
+      : ride.pickup_location;
+    const dropoffLocation = typeof ride.dropoff_location === 'string'
+      ? JSON.parse(ride.dropoff_location)
+      : ride.dropoff_location;
+
     return res.status(200).json({
       success: true,
       data: {
         ...ride,
-        pickup_location: JSON.parse(ride.pickup_location as any),
-        dropoff_location: JSON.parse(ride.dropoff_location as any),
+        pickup_location: pickupLocation,
+        dropoff_location: dropoffLocation,
       },
     });
   } catch (error) {
