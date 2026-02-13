@@ -309,7 +309,7 @@ function RideStatus({ rideId, onComplete }) {
               </div>
               <div className="summary-item">
                 <span>Duration:</span>
-                <span className="value">{trip.duration_minutes || '0'} minutes</span>
+                <span className="value">{trip.duration_minutes?.toFixed(1) || '0'} minutes</span>
               </div>
             </div>
 
