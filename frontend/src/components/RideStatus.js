@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { rides, trips } from '../services/api';
 import Payment from './Payment';
 import '../styles/RideStatus.css';
 
 function RideStatus({ rideId, onComplete }) {
+  const navigate = useNavigate();
   const [ride, setRide] = useState(null);
   const [driver, setDriver] = useState(null);
   const [trip, setTrip] = useState(null);
@@ -155,6 +157,11 @@ function RideStatus({ rideId, onComplete }) {
             console.error('Failed to free driver:', err);
           }
         }
+        
+        // Redirect to home after 2 seconds
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
       }
     } catch (err) {
       setError('Failed to end trip');
@@ -172,6 +179,10 @@ function RideStatus({ rideId, onComplete }) {
     if (paymentResult.success) {
       alert('🎉 Ride completed successfully!\n\nThank you for using our service!');
       onComplete && onComplete();
+      // Redirect to home after payment
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
     }
   };
 
