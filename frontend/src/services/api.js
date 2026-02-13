@@ -1,4 +1,6 @@
 // API Service - Centralized API calls
+import { generateUUID } from '../utils/uuid';
+
 const API_BASE_URL = 'http://localhost:8000/v1';
 
 // Rides API
@@ -8,7 +10,7 @@ export const rides = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_id: userId || 'user_' + Math.random().toString(36).substr(2, 9),
+        user_id: userId || generateUUID(),
         pickup_location: {
           latitude: parseFloat(pickupLocation.latitude),
           longitude: parseFloat(pickupLocation.longitude),

@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import LocationSelector from '../components/LocationSelector';
 import RideStatus from '../components/RideStatus';
 import { rides } from '../services/api';
+import { generateUUID } from '../utils/uuid';
 import '../styles/RideRequestFlow.css';
 
 function RideRequest() {
   const [currentStep, setCurrentStep] = useState(1); // Step 1: pickup, Step 2: dropoff, Step 3: confirmation
   const [formData, setFormData] = useState({
-    user_id: 'user_' + Math.random().toString(36).substr(2, 9),
+    user_id: generateUUID(),
     pickup_location: {
       address: '',
       latitude: '',
@@ -79,7 +80,7 @@ function RideRequest() {
         setRideId(response.data.id);
         // Reset form
         setFormData({
-          user_id: 'user_' + Math.random().toString(36).substr(2, 9),
+          user_id: generateUUID(),
           pickup_location: {
             address: '',
             latitude: '',
