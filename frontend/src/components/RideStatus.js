@@ -191,9 +191,9 @@ function RideStatus({ rideId, onComplete }) {
             await fetch(`http://localhost:8000/v1/drivers/${ride.driver_id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'available' }),
+              body: JSON.stringify({ status: 'online' }),
             });
-            console.log('✅ Driver freed and set to available');
+            console.log('✅ Driver freed and set to online');
           } catch (err) {
             console.error('Failed to free driver:', err);
           }
@@ -216,15 +216,15 @@ function RideStatus({ rideId, onComplete }) {
         setTrip(result.data);
         setCurrentStep('completed');
         
-        // Free the driver - set status back to 'available'
+        // Free the driver - set status back to 'online'
         if (ride?.driver_id) {
           try {
             await fetch(`http://localhost:8000/v1/drivers/${ride.driver_id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'available' }),
+              body: JSON.stringify({ status: 'online' }),
             });
-            console.log('✅ Driver freed and set to available');
+            console.log('✅ Driver freed and set to online');
           } catch (err) {
             console.error('Failed to free driver:', err);
           }
